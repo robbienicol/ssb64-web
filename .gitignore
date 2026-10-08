@@ -1,0 +1,14 @@
+# Local data and tooling
+data/
+node_modules/
+.venv/
+emsdk/
+vendor/
+*.log
+
+# Never commit game files
+rom/
+ssb-decomp-re/
+*.z64
+*.n64
+*.v64

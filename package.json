@@ -1,0 +1,16 @@
+{
+  "name": "ssb64-web",
+  "private": true,
+  "type": "module",
+  "description": "Play Super Smash Bros. 64 in the browser with your own ROM: online lobbies, ranked play, profiles.",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

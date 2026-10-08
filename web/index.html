@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSB64 Web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Titan+One&family=Silkscreen:wght@400;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="game-layer"><div id="game"></div></div>
+
+<div id="menu-layer">
+  <div class="bg" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">SSB64<span>WEB</span></div>
+    <div id="me-chip" hidden></div>
+  </header>
+
+  <main class="screens">
+    <section class="screen" id="screen-title">
+      <div class="title-block">
+        <div class="title-logo">SSB64<span>WEB</span></div>
+        <div class="title-sub">Online matchmaking · Profiles · Controller ready</div>
+        <button type="button" class="press-start" data-focus data-autofocus id="press-start">PRESS START</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-import">
+      <div class="panel narrow">
+        <h2>Load your game</h2>
+        <p class="muted">Pick your own Super Smash Bros. (USA) ROM. It stays in this browser and is never uploaded.</p>
+        <label class="dropzone" id="drop" data-focus data-autofocus tabindex="-1">
+          <strong>Choose ROM file</strong>
+          <span>or drop it here · .z64 .n64 .v64 .zip</span>
+          <input type="file" id="rom-file" accept=".z64,.n64,.v64,.zip">
+        </label>
+        <div class="status" id="import-status"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-create">
+      <div class="panel" id="create-tag">
+        <div class="eyebrow" id="create-eyebrow">New profile</div>
+        <h2>Pick a gamertag</h2>
+        <input type="text" id="tag-input" class="tag-input" placeholder="GAMERTAG" autocomplete="off" spellcheck="false">
+        <div class="status" id="tag-status"></div>
+        <div class="keyboard" id="keyboard"></div>
+      </div>
+      <div class="panel" id="create-avatar" hidden>
+        <div class="eyebrow">Profile picture</div>
+        <h2>Choose your look</h2>
+        <div class="avatar-grid" id="avatar-grid"></div>
+        <div class="row">
+          <button type="button" class="btn" data-focus id="avatar-upload">Upload photo</button>
+          <input type="file" id="avatar-file" accept="image/*" hidden>
+        </div>
+        <div class="status" id="avatar-status"></div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-main">
+      <div class="main-layout">
+        <nav class="menu">
+          <button type="button" class="menu-item c-red" data-focus data-autofocus data-go="online"><span class="mi-title">Online Match</span><span class="mi-sub">Find players and battle</span></button>
+          <button type="button" class="menu-item c-blue" data-focus data-go="local"><span class="mi-title">Local Play</span><span class="mi-sub">Couch play on this screen</span></button>
+          <button type="button" class="menu-item c-yellow" data-focus data-go="controls"><span class="mi-title">Controls</span><span class="mi-sub">Map your controller</span></button>
+          <button type="button" class="menu-item c-green" data-focus data-go="profile"><span class="mi-title">Profile</span><span class="mi-sub">Gamertag, picture, record</span></button>
+        </nav>
+        <aside class="main-side" id="main-card"></aside>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-mode">
+      <div class="size-head">
+        <div class="eyebrow">Online match</div>
+        <h2>Choose a playlist</h2>
+      </div>
+      <div class="mode-grid">
+        <button type="button" class="mode-tile c-red" data-focus data-autofocus data-mode="ranked">
+          <span class="mode-badge" id="mode-rank-badge"></span>
+          <span class="mode-title">Ranked</span>
+          <span class="mode-sub">1 vs 1 · climb the tiers</span>
+          <span class="mode-rank" id="mode-rank-label"></span>
+        </button>
+        <button type="button" class="mode-tile c-blue" data-focus data-mode="casual">
+          <span class="mode-icon">2-4</span>
+          <span class="mode-title">Casual</span>
+          <span class="mode-sub">1v1 or free-for-all · no rank on the line</span>
+        </button>
+      </div>
+      <div class="status" id="mode-status"></div>
+    </section>
+
+    <section class="screen" id="screen-size">
+      <div class="size-head">
+        <div class="eyebrow">Casual match</div>
+        <h2>How many players?</h2>
+      </div>
+      <div class="size-grid">
+        <button type="button" class="size-tile c-red" data-focus data-autofocus data-size="2"><span class="size-num">2</span><span class="size-label">1 vs 1</span></button>
+        <button type="button" class="size-tile c-yellow" data-focus data-size="3"><span class="size-num">3</span><span class="size-label">Free-for-all</span></button>
+        <button type="button" class="size-tile c-green" data-focus data-size="4"><span class="size-num">4</span><span class="size-label">Free-for-all</span></button>
+      </div>
+      <div class="status" id="size-status"></div>
+    </section>
+
+    <section class="screen" id="screen-lobby">
+      <div id="lobby-body"></div>
+      <div class="row center">
+        <button type="button" class="btn" data-focus data-autofocus id="lobby-leave">Leave lobby</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-controls">
+      <div class="panel wide">
+        <div class="controls-head">
+          <h2>Controls</h2>
+          <div class="tabs" id="player-tabs"></div>
+        </div>
+        <div class="pad-name" id="pad-name"></div>
+        <div class="bind-grid" id="bind-grid"></div>
+        <div class="row">
+          <button type="button" class="btn" data-focus id="controls-reset">Reset to defaults</button>
+          <button type="button" class="btn accent" data-focus id="controls-done">Done</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-profile">
+      <div class="panel narrow">
+        <div id="profile-card"></div>
+        <div class="rank-block" id="profile-rank"></div>
+        <div class="stats" id="profile-stats"></div>
+        <div class="stack">
+          <button type="button" class="btn" data-focus data-autofocus id="profile-tag">Change gamertag</button>
+          <button type="button" class="btn" data-focus id="profile-avatar">Change picture</button>
+          <button type="button" class="btn" data-focus id="profile-back">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-pause">
+      <div class="panel narrow">
+        <h2 id="pause-title">Paused</h2>
+        <div class="stack">
+          <button type="button" class="btn accent" data-focus data-autofocus id="pause-resume">Resume</button>
+          <button type="button" class="btn" data-focus id="pause-controls">Controls</button>
+          <button type="button" class="btn" data-focus id="pause-quit">Quit to menu</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="hints" id="hints">
+    <span><i class="glyph a">A</i>Select</span>
+    <span><i class="glyph b">B</i>Back</span>
+    <span><i class="glyph s">S</i>Menu in game</span>
+    <span class="keys">Keyboard: arrows · Enter · Esc</span>
+  </footer>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
