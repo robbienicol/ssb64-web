@@ -11,6 +11,11 @@ import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding }
 import { initOnline, queue, leave } from "./ui/online.js";
 
 const EJS_CDN = "https://cdn.emulatorjs.org/4.3.0-pre";
+
+// Keep every fighter, stage and feature unlocked, including on saves made
+// before the mod: constant writes to the save data's unlock masks
+// (gSCManagerBackupData + 0x457 unlock_mask, + 0x458 fighter_mask).
+const UNLOCK_ALL_CHEATS = ["800A4937 007F", "810A4938 0FFF"];
 const GAMERTAG_RE = /^[A-Za-z0-9_]{3,15}$/;
 const $ = (id) => document.getElementById(id);
 
@@ -94,6 +99,7 @@ async function bootEmulator() {
     EJS_Buttons: { netplay: false },
     EJS_onGameStart: () => {
       emulatorReady = true;
+      UNLOCK_ALL_CHEATS.forEach((code, i) => emu().gameManager.setCheat(i, 1, code));
       applyMaps();
       if (!playing) pauseGame();
     },
