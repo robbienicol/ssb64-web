@@ -73,3 +73,27 @@ export function applyMaps(maps = loadMaps()) {
   }
   emu.saveSettings?.();
 }
+
+// EmulatorJS only gives a controller to a player when the controller connects
+// after its settings menu exists, so a pad already in use on our menus never
+// reached the game. Hand connected pads to players 1-4 in connection order
+// (the same order the controls screen shows) and free slots of unplugged ones.
+export function syncGamepads() {
+  const emu = window.EJS_emulator;
+  if (!emu?.gamepad || !Array.isArray(emu.gamepadSelection)) return;
+  const connected = (emu.gamepad.gamepads || []).filter(Boolean).map((g) => `${g.id}_${g.index}`);
+  const selection = emu.gamepadSelection;
+  while (selection.length < 4) selection.push("");
+  let changed = false;
+  for (let p = 0; p < selection.length; p++) {
+    if (selection[p] && !connected.includes(selection[p])) { selection[p] = ""; changed = true; }
+  }
+  for (const id of connected) {
+    if (selection.includes(id)) continue;
+    const free = selection.indexOf("");
+    if (free < 0) break;
+    selection[free] = id;
+    changed = true;
+  }
+  if (changed && emu.gamepadLabels) emu.updateGamepadLabels?.();
+}
