@@ -64,6 +64,7 @@ async function connect() {
   socket.on("mm-matched", onMatched);
   socket.on("mm-signal", ({ from, data }) => mesh?.signal(from, data));
   socket.on("mm-ended", ({ reason }) => {
+    console.warn("[online] match ended by server:", reason);
     if (state !== "over") finish(reason);
   });
   socket.on("mm-recorded", async ({ winner, ranked, deltas }) => {
@@ -164,6 +165,7 @@ async function onMatched(m) {
     if (match !== m) return;
     for (const [slot, data] of early.splice(0)) engine.deliver(`p${slot}`, data);
   } catch (err) {
+    console.error("[online] match start failed", err);
     if (match === m) abort(err.message);
   }
 }
@@ -193,6 +195,7 @@ function onEvent(type, detail) {
 }
 
 function abort(message) {
+  console.warn("[online] match aborted:", message);
   socket?.emit("mm-leave");
   finish(message);
 }

@@ -7,6 +7,7 @@
 //   net      { send(peerId, bytes) } — the parent's WebRTC links
 //   onEvent  (type, detail) from the engine: session-start, stats,
 //            player-disconnected, desync, battle-over
+//   onMenu   the player pressed Esc
 // and pushes received packets with the returned deliver(peerId, bytes).
 const FILES = [
   ["f3d.o2r", "/f3d.o2r"],
@@ -15,7 +16,9 @@ const FILES = [
   ["fonts/Inconsolata-Regular.ttf", "/assets/custom/fonts/Inconsolata-Regular.ttf"],
 ];
 
-window.startMatch = async ({ o2r, env, net, onEvent, onLog = () => {}, build = "" }) => {
+window.startMatch = async ({ o2r, env, net, onEvent, onMenu, onLog = () => {}, build = "" }) => {
+  // Esc opens the site's match menu (keys pressed in here don't reach the page).
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") onMenu?.(); });
   const v = build ? `?v=${build}` : "";
   const files = await Promise.all(
     FILES.map(async ([url, path]) => {

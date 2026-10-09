@@ -69,6 +69,7 @@ export async function startEngine({ container, o2r, env, net, onEvent }) {
       net,
       build,
       onEvent,
+      onMenu: () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })),
       onLog: (line) => { if (/Rollback|Netplay|ERROR|abort/i.test(line)) console.log("[engine]", line); },
     });
     frame.focus();
