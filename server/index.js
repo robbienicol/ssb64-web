@@ -204,12 +204,34 @@ function battleSpec(lobby) {
     const f = Number(s.data.fighter);
     return Number.isInteger(f) && f >= 0 && f < FIGHTER_COUNT ? f : randomInt(FIGHTER_COUNT);
   });
-  // The same fighter twice gets a different costume per copy.
-  const costumes = fighters.map((f, i) => fighters.slice(0, i).filter((x) => x === f).length);
-  const stage = lobby.ranked ? RANKED_STAGE : VS_STAGES[randomInt(VS_STAGES.length)];
+  // Each player's color (0-3); the same fighter twice can't share a color.
+  const costumes = [];
+  fighters.forEach((f, i) => {
+    const want = Number(lobby.members[i].data.costume);
+    const taken = costumes.filter((c, j) => fighters[j] === f);
+    let c = Number.isInteger(want) && want >= 0 && want < 4 ? want : 0;
+    if (taken.includes(c)) c = [0, 1, 2, 3].find((x) => !taken.includes(x));
+    costumes.push(c);
+  });
+  // Casual: each player picked a stage (or random); one of the picks is used.
+  let stage = RANKED_STAGE;
+  let pickedBy = null;
+  let randomStage = false;
+  if (!lobby.ranked) {
+    pickedBy = randomInt(lobby.members.length);
+    const pick = Number(lobby.members[pickedBy].data.stage);
+    if (VS_STAGES.includes(pick)) {
+      stage = pick;
+    } else {
+      stage = VS_STAGES[randomInt(VS_STAGES.length)];
+      randomStage = true;
+    }
+  }
   const seed = randomInt(1, 2 ** 31);
   return {
     stage,
+    pickedBy,
+    randomStage,
     fighters,
     spec: `stage=${stage} seed=${seed} stocks=${STOCKS} fighters=${fighters.join(",")} costumes=${costumes.join(",")}`,
   };
@@ -374,6 +396,8 @@ io.on("connection", (socket) => {
     leaveLobby(socket, "left");
     socket.data.playerId = row.id;
     socket.data.fighter = data?.fighter;
+    socket.data.stage = data?.stage;
+    socket.data.costume = data?.costume;
 
     if (ranked) {
       rankedQueue.push({ socket, mmr: row.mmr, since: Date.now() });

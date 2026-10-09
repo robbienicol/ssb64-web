@@ -10,7 +10,7 @@ import { mountKeyboard } from "./ui/keyboard.js";
 import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, syncGamepads, patchGamepadHandler } from "./ui/controls.js";
 import { initOnline, queue, leave, inRankedMatch } from "./ui/online.js";
 import { ensureEngineFiles } from "./ui/engine.js";
-import { FIGHTERS, savedFighter, saveFighter } from "./ui/fighters.js";
+import { FIGHTERS, savedFighter, saveFighter, STAGE_CHOICES, savedStage, saveStage, savedCostume, saveCostume } from "./ui/fighters.js";
 
 const EJS_CDN = "https://cdn.emulatorjs.org/4.3.0-pre";
 
@@ -416,18 +416,79 @@ registerScreen("fighter", {
   onBack: () => go(fighterFrom),
 });
 
-async function chooseFighter(id) {
+function chooseFighter(id) {
   saveFighter(id);
   if (!pendingQueue) return go("mode");
+  go("costume");
+}
+
+registerScreen("costume", {
+  onEnter: () => {
+    setStatus("costume-status", "");
+    const fighter = FIGHTERS.find((f) => f.id === savedFighter()) || FIGHTERS[0];
+    $("costume-fighter").textContent = fighter.name;
+    const current = savedCostume(fighter.id);
+    const grid = $("costume-grid");
+    grid.innerHTML = "";
+    fighter.colors.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `costume-tile${i === current ? " current" : ""}`;
+      b.dataset.focus = "";
+      b.style.setProperty("--costume", c.hex);
+      b.innerHTML = `<span class="costume-swatch"></span><span class="costume-name"></span>`;
+      b.querySelector(".costume-name").textContent = c.name;
+      b.addEventListener("click", () => chooseCostume(fighter.id, i));
+      grid.append(b);
+    });
+    focus(grid.children[current] || grid.children[0], false);
+  },
+  onBack: () => go("fighter", { from: pendingQueue?.mode === "ranked" ? "mode" : "size" }),
+});
+
+function chooseCostume(fighter, costume) {
+  saveCostume(fighter, costume);
+  // Casual: pick a stage next. Ranked is always Dream Land.
+  if (pendingQueue?.mode === "casual") return go("stage");
+  joinQueue("costume-status");
+}
+
+async function joinQueue(statusId) {
   try {
-    setStatus("fighter-status", "Connecting…");
-    await queue(pendingQueue.mode, pendingQueue.size, id);
+    setStatus(statusId, "Connecting…");
+    const fighter = savedFighter();
+    await queue(pendingQueue.mode, pendingQueue.size, fighter, savedCostume(fighter), pendingQueue.mode === "casual" ? savedStage() : undefined);
     go("lobby");
   } catch (err) {
     sfx("error");
-    setStatus("fighter-status", err.message, true);
+    setStatus(statusId, err.message, true);
   }
 }
+
+registerScreen("stage", {
+  onEnter: () => {
+    setStatus("stage-status", "");
+    const grid = $("stage-grid");
+    const current = savedStage();
+    grid.innerHTML = "";
+    for (const st of STAGE_CHOICES) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `stage-tile${st.id === current ? " current" : ""}${st.id < 0 ? " random" : ""}`;
+      b.dataset.focus = "";
+      b.style.setProperty("--stage", st.color);
+      b.innerHTML = `<span class="stage-name"></span>`;
+      b.querySelector(".stage-name").textContent = st.id < 0 ? "? Random" : st.name;
+      b.addEventListener("click", () => {
+        saveStage(st.id);
+        joinQueue("stage-status");
+      });
+      grid.append(b);
+    }
+    focus(grid.children[Math.max(0, STAGE_CHOICES.findIndex((s) => s.id === current))], false);
+  },
+  onBack: () => go("costume"),
+});
 
 registerScreen("lobby", { onBack: () => leave() });
 $("lobby-leave").addEventListener("click", () => leave());

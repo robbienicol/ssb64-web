@@ -97,14 +97,15 @@ async function connect() {
   });
 }
 
-// mode: "ranked" | "casual"; size: 2-4 for casual; fighter: engine fighter id.
-export async function queue(mode, size, fighter) {
+// mode: "ranked" | "casual"; size: 2-4 for casual; fighter: engine fighter id;
+// costume: VS color 0-3; stage: casual stage pick (engine stage id, -1 = random).
+export async function queue(mode, size, fighter, costume, stage) {
   await hooks.ensureFiles?.();
   prefetchEngine(); // download the engine while waiting for players
   await connect();
   const ranked = mode === "ranked";
   const res = await new Promise((resolve) =>
-    socket.emit("mm-queue", { token: getToken(), mode, size, fighter }, resolve)
+    socket.emit("mm-queue", { token: getToken(), mode, size, fighter, costume, stage }, resolve)
   );
   if (res?.error) throw new Error(res.error);
   state = "waiting";
@@ -306,7 +307,11 @@ function renderLobby() {
   }
   const title = match ? "MATCH FOUND" : ranked ? "SEARCHING" : "FINDING PLAYERS";
   let sub;
-  if (match) sub = `<div class="lobby-note">${STAGES[match.battle.stage] || ""}</div><div class="lobby-note" id="lobby-status">${status}</div>`;
+  if (match) {
+    const by = match.battle.pickedBy;
+    const picker = by === null || by === undefined ? "" : by === match.slot ? " · your pick" : ` · ${members[by]?.gamertag || "their"}'s pick`;
+    sub = `<div class="lobby-stage">${STAGES[match.battle.stage] || ""}<span>${match.battle.randomStage ? " · random" : picker}</span></div><div class="lobby-note" id="lobby-status">${status}</div>`;
+  }
   else if (ranked) sub = `<div class="lobby-count">${clock(search?.elapsed || 0)}</div><div class="lobby-note">Search range ±${search?.range || 100} MMR</div>`;
   else sub = `<div class="lobby-count">${members.length} / ${size}</div>`;
   root.innerHTML = `
