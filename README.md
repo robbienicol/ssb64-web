@@ -8,9 +8,13 @@ Play Super Smash Bros. (N64) in the browser with online lobbies, ranked 1v1, pro
 ## What's here
 
 - `web/` — the site: ROM import, retro controller-navigable menus, profiles, ranked/casual matchmaking, controller mapping.
-  The game runs in [EmulatorJS](https://emulatorjs.org); mods ship as a small BPS patch (`web/mod.bps`) applied in the browser.
+  Local play runs in [EmulatorJS](https://emulatorjs.org); mods ship as a small BPS patch (`web/mod.bps`) applied in the browser.
+- `web/engine/` — online matches: a WebAssembly build of [BattleShip](https://github.com/robbienicol/BattleShip/tree/rollback)
+  (the native port of the decompilation) with rollback netcode (GekkoNet). Each player's browser runs the game and
+  trades inputs peer to peer over WebRTC. Its game files are extracted from the player's own ROM in the browser
+  (Torch, `engine/extract.js`). Rebuild with `tools/build-engine.sh`.
 - `server/` — Node server: static site, profile API (SQLite), lobby/ranked matchmaking and netplay signaling.
-- `tools/` — `make-bps.mjs` builds the mod patch from a modded ROM built with the
+- `tools/` — `build-engine.sh` packages the engine; `make-bps.mjs` builds the mod patch from a modded ROM built with the
   [ssb-decomp-re](https://github.com/VetriTheRetri/ssb-decomp-re) decompilation; `build-mod.sh` runs the whole build.
 - `docker/` — x86-64 Linux image for building the decomp on Apple Silicon.
 
@@ -25,5 +29,5 @@ Then open http://localhost:8064. Profiles are stored in `data/ssb64.db` (overrid
 
 ## Status
 
-Online play currently streams the host's game to the other players. Rollback netcode on a native WebAssembly
-build of the game is in progress.
+Online matches (ranked 1v1, casual 2-4 players) use rollback netcode. Players behind very strict NATs may not be
+able to connect yet (no TURN relay).

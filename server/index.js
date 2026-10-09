@@ -1,7 +1,8 @@
 // Serves the web player, player profiles, lobby matchmaking and the EmulatorJS netplay signaling protocol.
 import express from "express";
+import compression from "compression";
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
 import {
@@ -14,6 +15,7 @@ const AVATAR_MAX_BYTES = 300 * 1024;
 const AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const app = express();
+app.use(compression()); // the game engine is ~13 MB of wasm, ~4 MB gzipped
 app.use(express.static(WEB_DIR, { extensions: ["html"] }));
 const http = createServer(app);
 const io = new Server(http, { cors: { origin: true } });
@@ -121,8 +123,8 @@ function leaveRoom(socket) {
 }
 
 // --- Lobby matchmaking -------------------------------------------------------
-// Players pick a match size (2-4) and wait in a lobby until it fills. The first
-// member hosts: their browser runs the game and streams it to the others.
+// Players pick a match size (2-4) and wait in a lobby until it fills, then the
+// match runs on every member's browser with rollback netcode (see below).
 const LOBBY_SIZES = new Set([2, 3, 4]);
 // lobbyId -> { id, size, members: [socket], status: "waiting" | "starting" | "playing",
 //              password, roomName, sessionId?, netplayIds: Map<userid, playerId>, lastResultSeq }
@@ -187,8 +189,35 @@ setInterval(() => {
   }
 }, 1000);
 
+// --- Rollback matches -------------------------------------------------------------
+// Every browser runs the game itself (BattleShip engine, rollback netcode) and
+// exchanges inputs peer to peer; the server only relays WebRTC signaling and
+// records results. All peers get the same battle spec (see the engine's
+// SSB64_NETPLAY_BATTLE): fighters per slot, stage, seed.
+const FIGHTER_COUNT = 12; // Mario .. Ness
+const VS_STAGES = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // Peach's Castle .. Mushroom Kingdom
+const RANKED_STAGE = 6; // Dream Land
+const STOCKS = 4;
+
+function battleSpec(lobby) {
+  const fighters = lobby.members.map((s) => {
+    const f = Number(s.data.fighter);
+    return Number.isInteger(f) && f >= 0 && f < FIGHTER_COUNT ? f : randomInt(FIGHTER_COUNT);
+  });
+  // The same fighter twice gets a different costume per copy.
+  const costumes = fighters.map((f, i) => fighters.slice(0, i).filter((x) => x === f).length);
+  const stage = lobby.ranked ? RANKED_STAGE : VS_STAGES[randomInt(VS_STAGES.length)];
+  const seed = randomInt(1, 2 ** 31);
+  return {
+    stage,
+    fighters,
+    spec: `stage=${stage} seed=${seed} stocks=${STOCKS} fighters=${fighters.join(",")} costumes=${costumes.join(",")}`,
+  };
+}
+
 function startLobby(lobby) {
   lobby.status = "starting";
+  lobby.battle = battleSpec(lobby);
   lobby.password = randomUUID().slice(0, 8);
   lobby.roomName = lobby.members.map((s) => playerById(s.data.playerId)?.gamertag).join(" vs ");
   const roster = lobby.members.map(memberView);
@@ -201,6 +230,7 @@ function startLobby(lobby) {
       roster,
       roomName: lobby.roomName,
       password: lobby.password,
+      battle: lobby.battle,
     });
   });
 }
@@ -225,6 +255,7 @@ function leaveLobby(socket, reason) {
     broadcastLobby(lobby);
     return;
   }
+  if (lobby.status === "done") return; // result recorded; everyone is leaving anyway
   // A match in progress can't continue without everyone; send the rest back to the menu.
   const name = playerById(socket.data.playerId)?.gamertag || "A player";
   lobby.members.forEach((s) => {
@@ -324,6 +355,7 @@ io.on("connection", (socket) => {
     if (!LOBBY_SIZES.has(size)) return ack({ error: "Pick 2, 3 or 4 players" });
     leaveLobby(socket, "left");
     socket.data.playerId = row.id;
+    socket.data.fighter = data?.fighter;
 
     if (ranked) {
       rankedQueue.push({ socket, mmr: row.mmr, since: Date.now() });
@@ -380,6 +412,46 @@ io.on("connection", (socket) => {
     if (lobby.ranked && results.length !== 2) return;
     lobby.lastResultSeq = seq;
     const { deltas } = recordMatch(lobby.size, results, lobby.ranked);
+    const roster = lobby.members.map(memberView);
+    lobby.members.forEach((s) => s.emit("mm-recorded", {
+      ranked: lobby.ranked,
+      roster,
+      deltas,
+      winner: publicPlayer(playerById(results.find((r) => r.won).playerId)),
+    }));
+  });
+
+  // WebRTC signaling between two members of a match: { to: slot, data }.
+  socket.on("mm-signal", (msg) => {
+    const lobby = lobbyOf(socket);
+    if (!lobby || lobby.status === "waiting") return;
+    const from = lobby.members.indexOf(socket);
+    const to = lobby.members[Number(msg?.to)];
+    if (from < 0 || !to || to === socket) return;
+    to.emit("mm-signal", { from, data: msg.data });
+  });
+
+  // Any member reports the finished battle as the engine saw it (every peer
+  // simulates the same battle). The first valid report is recorded.
+  // results: { players: [{ slot, place, ... }] } — place 0 is the winner.
+  socket.on("mm-battle", (data) => {
+    const lobby = lobbyOf(socket);
+    if (!lobby || (lobby.status !== "playing" && lobby.status !== "starting")) return;
+    const players = Array.isArray(data?.players) ? data.players : [];
+    const results = [];
+    lobby.members.forEach((s, slot) => {
+      const p = players.find((x) => Number(x?.slot) === slot);
+      if (p) results.push({ playerId: s.data.playerId, port: slot, won: Number(p.place) === 0 });
+    });
+    if (results.length !== lobby.members.length || results.filter((r) => r.won).length !== 1) return;
+    lobby.status = "done";
+    let deltas;
+    try {
+      ({ deltas } = recordMatch(lobby.size, results, lobby.ranked));
+    } catch (err) {
+      console.error("recordMatch failed", err);
+      return;
+    }
     const roster = lobby.members.map(memberView);
     lobby.members.forEach((s) => s.emit("mm-recorded", {
       ranked: lobby.ranked,

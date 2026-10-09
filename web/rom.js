@@ -80,3 +80,14 @@ const tx = async (mode, fn) => {
 export const loadSavedRom = () => tx("readonly", (s) => s.get(KEY)).catch(() => undefined);
 export const saveRom = (bytes) => tx("readwrite", (s) => s.put(bytes, KEY)).catch(() => undefined);
 export const forgetRom = () => tx("readwrite", (s) => s.delete(KEY)).catch(() => undefined);
+
+// Game files the engine extracts from the ROM (BattleShip.o2r) live in the same
+// store, keyed by the extraction recipe so an engine update re-extracts.
+export const loadAsset = (key) => tx("readonly", (s) => s.get(key)).catch(() => undefined);
+export async function saveAsset(key, bytes) {
+  const keys = await tx("readonly", (s) => s.getAllKeys()).catch(() => []);
+  for (const old of keys) {
+    if (old !== KEY && old !== key) await tx("readwrite", (s) => s.delete(old)).catch(() => {});
+  }
+  return tx("readwrite", (s) => s.put(bytes, key)).catch(() => undefined);
+}

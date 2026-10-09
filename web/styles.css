@@ -35,6 +35,9 @@ button { font: inherit; color: inherit; }
 /* ---------- layers ---------- */
 #game-layer { position: fixed; inset: 0; background: #000; }
 #game { width: 100%; height: 100%; }
+/* Online matches: the rollback engine's iframe covers the emulator. */
+.engine-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+#game-layer.engine #game { visibility: hidden; }
 #menu-layer { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; z-index: 10; }
 #menu-layer.overlay .bg { opacity: 0.9; }
 
@@ -130,7 +133,7 @@ h2 {
 
 /* ---------- plastic buttons ---------- */
 [data-focus] { cursor: pointer; outline: none; }
-.btn, .menu-item, .mode-tile, .size-tile, .key, .bind-row, .tab, .press-start {
+.btn, .menu-item, .mode-tile, .size-tile, .fighter-tile, .key, .bind-row, .tab, .press-start {
   --c: #4a5ae6;
   position: relative; border: 3px solid var(--ink); border-radius: 14px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--c) 82%, #fff) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 70%, #000) 100%);
@@ -144,7 +147,7 @@ h2 {
 .c-green { --c: var(--green); }
 .btn { padding: 13px 22px; font: 400 18px var(--title); letter-spacing: 0.02em; }
 .btn.accent { --c: var(--green); }
-.btn:not(.focused), .menu-item:not(.focused), .mode-tile:not(.focused), .size-tile:not(.focused), .key:not(.focused), .bind-row:not(.focused), .tab:not(.focused) { filter: saturate(0.75) brightness(0.88); }
+.btn:not(.focused), .menu-item:not(.focused), .mode-tile:not(.focused), .size-tile:not(.focused), .fighter-tile:not(.focused), .key:not(.focused), .bind-row:not(.focused), .tab:not(.focused) { filter: saturate(0.75) brightness(0.88); }
 
 .focused {
   transform: translateY(-3px) scale(1.04);
@@ -255,6 +258,13 @@ h2 {
 .size-num { font: 400 clamp(72px, 10vw, 120px)/1 var(--title); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); }
 .size-label { font: 700 13px var(--pixel); }
 
+/* ---------- fighter select ---------- */
+.fighter-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 150px)); gap: 16px; justify-content: center; }
+.fighter-tile { --c: var(--fighter); aspect-ratio: 1; display: grid; place-items: end center; padding: 10px 6px; border-radius: 16px; }
+.fighter-tile.current { outline: 3px dashed #fff; outline-offset: 3px; }
+.fighter-name { font: 700 12px var(--pixel); text-align: center; line-height: 1.3; }
+.slot-fighter { position: absolute; right: 10px; bottom: 8px; font: 700 11px var(--pixel); color: var(--gold-1); text-shadow: 0 2px 0 var(--ink); }
+
 /* ---------- lobby ---------- */
 #screen-lobby.active { align-content: center; gap: 14px; }
 #lobby-body { width: min(1100px, 100%); }
@@ -311,6 +321,7 @@ h2 {
   .mode-grid { grid-template-columns: 1fr; }
   .mode-tile { min-height: 0; }
   .size-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .fighter-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .lobby-grid.size-3, .lobby-grid.size-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bind-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .avatar-grid { grid-template-columns: repeat(4, 1fr); }

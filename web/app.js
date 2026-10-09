@@ -9,6 +9,8 @@ import { rankBadgeSvg, PLACEMENT_GAMES } from "./ui/ranks.js";
 import { mountKeyboard } from "./ui/keyboard.js";
 import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, syncGamepads, patchGamepadHandler } from "./ui/controls.js";
 import { initOnline, queue, leave } from "./ui/online.js";
+import { ensureEngineFiles } from "./ui/engine.js";
+import { FIGHTERS, savedFighter, saveFighter } from "./ui/fighters.js";
 
 const EJS_CDN = "https://cdn.emulatorjs.org/4.3.0-pre";
 
@@ -118,16 +120,20 @@ function requireGame() {
   return false;
 }
 
+// Online matches run in the rollback engine's iframe; local play in EmulatorJS.
 function enterGame(kind) {
   playing = kind;
   showMenuLayer(false);
   setMode("game");
-  if (kind === "local" || emu()?.netplay?.owner) resumeGame();
+  $("game-layer").classList.toggle("engine", kind === "online");
+  if (kind === "local") resumeGame();
+  else pauseGame();
 }
 
 function exitToMenu(message) {
   playing = null;
   pauseGame();
+  $("game-layer").classList.remove("engine");
   showMenuLayer(true);
   setMode("menu");
   go("main");
@@ -145,6 +151,7 @@ function closePause() {
   showMenuLayer(false);
   setMode("game");
   if (playing === "local") resumeGame();
+  document.querySelector(".engine-frame")?.focus();
 }
 
 onAction((action) => {
@@ -154,9 +161,14 @@ onAction((action) => {
 });
 
 // ---------- title & import ---------------------------------------------------------
+// The online engine's game files come from the ROM; prepare them early so the
+// first match doesn't wait.
+const prepareEngine = () => ensureEngineFiles(baseRom).catch((err) => console.warn(err));
+
 function afterTitle() {
   unlockAudio();
   bootEmulator();
+  prepareEngine();
   go(me ? "main" : "create", { mode: "create" });
 }
 
@@ -306,7 +318,7 @@ document.querySelectorAll("#screen-main [data-go]").forEach((b) =>
   b.addEventListener("click", () => {
     const target = b.dataset.go;
     if (target === "online") {
-      if (requireGame()) go("mode");
+      go("mode"); // online matches use the rollback engine, not the emulator
     } else if (target === "local") {
       if (requireGame()) enterGame("local");
     } else if (target === "controls") {
@@ -323,9 +335,18 @@ initOnline({
   refreshProfile,
   me: () => me,
   gamertag: () => me?.gamertag,
+  ensureFiles: () => ensureEngineFiles(baseRom, toast),
+  container: () => $("game-layer"),
   enterGame: () => enterGame("online"),
   exitToMenu,
 });
+
+// Ranked or a casual size picks a fighter next, then queues.
+let pendingQueue = null;
+function pickFighterThen(mode, size) {
+  pendingQueue = { mode, size };
+  go("fighter", { from: mode === "ranked" ? "mode" : "size" });
+}
 
 registerScreen("mode", {
   onEnter: () => {
@@ -339,14 +360,7 @@ registerScreen("mode", {
 document.querySelectorAll("#screen-mode [data-mode]").forEach((tile) =>
   tile.addEventListener("click", async () => {
     if (tile.dataset.mode === "casual") return go("size");
-    try {
-      setStatus("mode-status", "Connecting…");
-      await queue("ranked");
-      go("lobby");
-    } catch (err) {
-      sfx("error");
-      setStatus("mode-status", err.message, true);
-    }
+    pickFighterThen("ranked");
   })
 );
 
@@ -355,17 +369,45 @@ registerScreen("size", {
   onBack: () => go("mode"),
 });
 document.querySelectorAll("#screen-size [data-size]").forEach((tile) =>
-  tile.addEventListener("click", async () => {
-    try {
-      setStatus("size-status", "Connecting…");
-      await queue("casual", Number(tile.dataset.size));
-      go("lobby");
-    } catch (err) {
-      sfx("error");
-      setStatus("size-status", err.message, true);
-    }
-  })
+  tile.addEventListener("click", () => pickFighterThen("casual", Number(tile.dataset.size)))
 );
+
+let fighterFrom = "mode";
+registerScreen("fighter", {
+  onEnter: ({ from } = {}) => {
+    fighterFrom = from || "mode";
+    setStatus("fighter-status", "");
+    const grid = $("fighter-grid");
+    const current = savedFighter();
+    grid.innerHTML = "";
+    for (const f of FIGHTERS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `fighter-tile${f.id === current ? " current" : ""}`;
+      b.dataset.focus = "";
+      b.style.setProperty("--fighter", f.color);
+      b.innerHTML = `<span class="fighter-name"></span>`;
+      b.querySelector(".fighter-name").textContent = f.name;
+      b.addEventListener("click", () => chooseFighter(f.id));
+      grid.append(b);
+    }
+    focus(grid.children[Math.max(0, FIGHTERS.findIndex((f) => f.id === current))], false);
+  },
+  onBack: () => go(fighterFrom),
+});
+
+async function chooseFighter(id) {
+  saveFighter(id);
+  if (!pendingQueue) return go("mode");
+  try {
+    setStatus("fighter-status", "Connecting…");
+    await queue(pendingQueue.mode, pendingQueue.size, id);
+    go("lobby");
+  } catch (err) {
+    sfx("error");
+    setStatus("fighter-status", err.message, true);
+  }
+}
 
 registerScreen("lobby", { onBack: () => leave() });
 $("lobby-leave").addEventListener("click", () => leave());

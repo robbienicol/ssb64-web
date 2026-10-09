@@ -12,3 +12,8 @@ ssb-decomp-re/
 *.z64
 *.n64
 *.v64
+
+# Game files extracted from a ROM never get committed
+BattleShip.o2r
+*.o2r
+!web/engine/f3d.o2r
