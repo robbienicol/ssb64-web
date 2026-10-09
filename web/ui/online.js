@@ -7,12 +7,13 @@ import { getToken } from "./api.js";
 import { playerCardHtml } from "./avatars.js";
 import { rankFor } from "./ranks.js";
 import { createMesh } from "./rtc.js";
-import { startEngine } from "./engine.js";
+import { startEngine, prefetchEngine } from "./engine.js";
 import { fighterName, STAGES } from "./fighters.js";
 import { sfx } from "./sfx.js";
 
 const SIZE_NAMES = { 2: "1 vs 1", 3: "3-player free-for-all", 4: "4-player free-for-all" };
-const CONNECT_TIMEOUT_MS = 25000;
+const CONNECT_TIMEOUT_MS = 25000; // WebRTC links to every player
+const START_TIMEOUT_MS = 90000; // engine download/boot and rollback sync
 const RESULTS_HOLD_MS = 7000;
 
 let socket = null;
@@ -92,6 +93,7 @@ async function connect() {
 // mode: "ranked" | "casual"; size: 2-4 for casual; fighter: engine fighter id.
 export async function queue(mode, size, fighter) {
   await hooks.ensureFiles?.();
+  prefetchEngine(); // download the engine while waiting for players
   await connect();
   const ranked = mode === "ranked";
   const res = await new Promise((resolve) =>
@@ -145,6 +147,8 @@ async function onMatched(m) {
     setStatus("Connecting to players…");
     const [o2r] = await Promise.all([hooks.ensureFiles(), mesh.ready]);
     if (match !== m) return;
+    clearTimeout(connectTimer);
+    connectTimer = setTimeout(() => abort("The match took too long to start. Try again."), START_TIMEOUT_MS);
     setStatus("Loading the game…");
     const peers = m.roster.map((_, i) => `p${i}`).join(",");
     hooks.enterGame?.();

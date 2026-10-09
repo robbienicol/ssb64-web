@@ -50,6 +50,19 @@ export function ensureEngineFiles(rom, onStatus) {
   return preparing;
 }
 
+// Warms the browser cache with the engine so a match starts quickly.
+let prefetched = false;
+export async function prefetchEngine() {
+  if (prefetched) return;
+  prefetched = true;
+  try {
+    const { build } = await getManifest();
+    await Promise.all(["BattleShip.wasm", "BattleShip.js"].map((f) => fetch(`engine/${f}?v=${build}`).then((r) => r.arrayBuffer())));
+  } catch {
+    prefetched = false;
+  }
+}
+
 // Starts one match. Returns { deliver(peerId, bytes), close() }.
 export async function startEngine({ container, o2r, env, net, onEvent }) {
   const { build } = await getManifest();

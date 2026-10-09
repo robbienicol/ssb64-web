@@ -25,6 +25,7 @@ let me = null;
 let baseRom = null;
 let emulatorStarted = false;
 let emulatorReady = false;
+let localPending = false; // Local Play picked while the emulator loads
 let playing = null; // null | "local" | "online"
 
 // ---------- shared UI ----------------------------------------------------------
@@ -105,7 +106,12 @@ async function bootEmulator() {
       applyMaps();
       patchGamepadHandler();
       setInterval(syncGamepads, 1000);
-      if (!playing) pauseGame();
+      if (localPending && !playing) {
+        localPending = false;
+        enterGame("local");
+      } else if (playing !== "local") {
+        pauseGame();
+      }
     },
   });
   const script = document.createElement("script");
@@ -113,11 +119,12 @@ async function bootEmulator() {
   document.body.append(script);
 }
 
-function requireGame() {
-  if (emulatorReady) return true;
-  sfx("error");
-  toast("The game is still loading. One moment…");
-  return false;
+// Local play runs in EmulatorJS, loaded on first use (online play doesn't need it).
+function startLocalPlay() {
+  if (emulatorReady) return enterGame("local");
+  localPending = true;
+  toast("Loading the game…");
+  bootEmulator();
 }
 
 // Online matches run in the rollback engine's iframe; local play in EmulatorJS.
@@ -167,7 +174,6 @@ const prepareEngine = () => ensureEngineFiles(baseRom).catch((err) => console.wa
 
 function afterTitle() {
   unlockAudio();
-  bootEmulator();
   prepareEngine();
   go(me ? "main" : "create", { mode: "create" });
 }
@@ -320,7 +326,7 @@ document.querySelectorAll("#screen-main [data-go]").forEach((b) =>
     if (target === "online") {
       go("mode"); // online matches use the rollback engine, not the emulator
     } else if (target === "local") {
-      if (requireGame()) enterGame("local");
+      startLocalPlay();
     } else if (target === "controls") {
       go("controls", { from: "main" });
     } else {
