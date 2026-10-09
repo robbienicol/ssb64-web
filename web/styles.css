@@ -169,10 +169,6 @@ h2 {
 
 /* ---------- title ---------- */
 .title-block { text-align: center; }
-.credit { margin-top: 28px; font: 400 11px var(--pixel); color: #c9cff5; text-shadow: 0 2px 0 var(--ink); letter-spacing: 0.04em; }
-.credit b { color: var(--gold-1); font-weight: 700; }
-.credit a { color: #9fd3ff; }
-.menu .credit { margin-top: 18px; }
 .title-logo { font-size: clamp(56px, 11vw, 132px); line-height: 1; -webkit-text-stroke-width: 4px; filter: drop-shadow(0 8px 0 var(--ink)) drop-shadow(0 0 30px rgba(255, 178, 26, 0.4)); animation: float 3s ease-in-out infinite; }
 @keyframes float { 50% { transform: translateY(-8px) rotate(-1deg); } }
 .title-sub { font: 400 14px var(--pixel); color: #e3e7ff; text-shadow: 0 2px 0 var(--ink); margin: 18px 0 44px; letter-spacing: 0.06em; }
