@@ -257,6 +257,9 @@ h2 {
 .size-tile { aspect-ratio: 4 / 5; display: grid; place-items: center; align-content: center; gap: 6px; border-radius: 20px; }
 .size-num { font: 400 clamp(72px, 10vw, 120px)/1 var(--title); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); }
 .size-label { font: 700 13px var(--pixel); }
+.size-tile.soon { --c: #5b5f7a; position: relative; }
+.size-tile.soon .size-num { opacity: 0.55; }
+.soon-tag { position: absolute; top: 12px; left: 50%; transform: translateX(-50%) rotate(-4deg); white-space: nowrap; padding: 4px 10px; border: 3px solid var(--ink); border-radius: 10px; background: var(--gold-1); color: var(--ink); text-shadow: none; font: 700 11px var(--pixel); }
 
 /* ---------- fighter select ---------- */
 .fighter-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 150px)); gap: 16px; justify-content: center; }

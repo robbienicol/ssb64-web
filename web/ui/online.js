@@ -108,10 +108,14 @@ export async function queue(mode, size, fighter) {
   renderLobby();
 }
 
+// The player chose to leave (from the lobby or the match menu). Quitting a
+// ranked match that is underway counts as a loss.
 export function leave() {
-  socket?.emit("mm-leave");
+  socket?.emit("mm-leave", { quit: true });
   finish(null);
 }
+
+export const inRankedMatch = () => !!match?.ranked && state === "playing";
 
 function setStatus(text) {
   status = text;

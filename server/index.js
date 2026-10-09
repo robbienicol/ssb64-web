@@ -125,7 +125,7 @@ function leaveRoom(socket) {
 // --- Lobby matchmaking -------------------------------------------------------
 // Players pick a match size (2-4) and wait in a lobby until it fills, then the
 // match runs on every member's browser with rollback netcode (see below).
-const LOBBY_SIZES = new Set([2, 3, 4]);
+const LOBBY_SIZES = new Set([2]); // 3-4 player online: coming soon
 // lobbyId -> { id, size, members: [socket], status: "waiting" | "starting" | "playing",
 //              password, roomName, sessionId?, netplayIds: Map<userid, playerId>, lastResultSeq }
 const lobbies = new Map();
@@ -241,11 +241,16 @@ function notifyGuests(lobby) {
   );
 }
 
-function leaveLobby(socket, reason) {
+// forfeit: the player quit (or closed the page) mid-match; in ranked that is a loss.
+function leaveLobby(socket, reason, forfeit = false) {
   leaveRankedQueue(socket);
   const lobby = lobbyOf(socket);
   socket.data.lobbyId = null;
   if (!lobby) return;
+  const finished = lobby.status === "done";
+  if (forfeit && lobby.ranked && lobby.status === "playing" && lobby.members.length === 2) {
+    recordForfeit(lobby, socket);
+  }
   lobby.members = lobby.members.filter((s) => s !== socket);
   if (lobby.members.length === 0) {
     lobbies.delete(lobby.id);
@@ -255,7 +260,7 @@ function leaveLobby(socket, reason) {
     broadcastLobby(lobby);
     return;
   }
-  if (lobby.status === "done") return; // result recorded; everyone is leaving anyway
+  if (finished) return; // result recorded; everyone is leaving anyway
   // A match in progress can't continue without everyone; send the rest back to the menu.
   const name = playerById(socket.data.playerId)?.gamertag || "A player";
   lobby.members.forEach((s) => {
@@ -263,6 +268,19 @@ function leaveLobby(socket, reason) {
     s.emit("mm-ended", { reason: `${name} ${reason}` });
   });
   lobbies.delete(lobby.id);
+}
+
+function recordForfeit(lobby, quitter) {
+  const results = lobby.members.map((s, slot) => ({ playerId: s.data.playerId, port: slot, won: s !== quitter }));
+  lobby.status = "done";
+  try {
+    const { deltas } = recordMatch(lobby.size, results, lobby.ranked);
+    const roster = lobby.members.map(memberView);
+    const winner = publicPlayer(playerById(results.find((r) => r.won).playerId));
+    lobby.members.forEach((s) => s.emit("mm-recorded", { ranked: true, roster, deltas, winner, forfeit: true }));
+  } catch (err) {
+    console.error("recordMatch (forfeit) failed", err);
+  }
 }
 
 io.on("connection", (socket) => {
@@ -352,7 +370,7 @@ io.on("connection", (socket) => {
     if (!row) return ack({ error: "Create a profile first" });
     const ranked = data?.mode === "ranked";
     const size = ranked ? 2 : Number(data?.size);
-    if (!LOBBY_SIZES.has(size)) return ack({ error: "Pick 2, 3 or 4 players" });
+    if (!LOBBY_SIZES.has(size)) return ack({ error: "3 and 4 player online is coming soon." });
     leaveLobby(socket, "left");
     socket.data.playerId = row.id;
     socket.data.fighter = data?.fighter;
@@ -372,7 +390,8 @@ io.on("connection", (socket) => {
     if (lobby.members.length === lobby.size) startLobby(lobby);
   });
 
-  socket.on("mm-leave", () => leaveLobby(socket, "left the match"));
+  // data.quit: the player chose to leave (a forfeit in ranked), not a network error.
+  socket.on("mm-leave", (data) => leaveLobby(socket, "left the match", !!data?.quit));
 
   // Each browser reports the EmulatorJS netplay user id it got, so results can be matched to profiles.
   socket.on("mm-netplay-id", (data) => {
@@ -462,7 +481,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    leaveLobby(socket, "disconnected");
+    leaveLobby(socket, "disconnected", true);
     leaveRoom(socket);
   });
 });

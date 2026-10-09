@@ -2,6 +2,7 @@
 // game files from the player's own ROM once, then runs each match in a fresh
 // iframe (web/engine/play.html) that is removed when the match ends.
 import { loadAsset, saveAsset } from "../rom.js";
+import { makeN64Reader } from "./n64pad.js";
 
 let manifest = null;
 let preparing = null;
@@ -66,6 +67,7 @@ export async function prefetchEngine() {
 // Starts one match. Returns { deliver(peerId, bytes), close() }.
 export async function startEngine({ container, o2r, env, net, onEvent }) {
   const { build } = await getManifest();
+  const reader = makeN64Reader(); // the Controls screen's current mapping
   const frame = document.createElement("iframe");
   frame.className = "engine-frame";
   frame.allow = "gamepad; autoplay; fullscreen";
@@ -83,6 +85,8 @@ export async function startEngine({ container, o2r, env, net, onEvent }) {
       build,
       onEvent,
       onMenu: () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })),
+      // Gamepads as the game frame sees them, else as this page does.
+      readInput: (keys, pads) => reader.read(keys, [...pads].some(Boolean) ? pads : navigator.getGamepads?.() || []),
       onLog: (line) => { if (/Rollback|Netplay|ERROR|abort/i.test(line)) console.log("[engine]", line); },
     });
     frame.focus();

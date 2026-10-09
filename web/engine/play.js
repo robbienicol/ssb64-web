@@ -8,6 +8,7 @@
 //   onEvent  (type, detail) from the engine: session-start, stats,
 //            player-disconnected, desync, battle-over
 //   onMenu   the player pressed Esc
+//   readInput (keys, gamepads) -> { buttons, x, y }: this player's N64 input
 // and pushes received packets with the returned deliver(peerId, bytes).
 const FILES = [
   ["f3d.o2r", "/f3d.o2r"],
@@ -16,9 +17,17 @@ const FILES = [
   ["fonts/Inconsolata-Regular.ttf", "/assets/custom/fonts/Inconsolata-Regular.ttf"],
 ];
 
-window.startMatch = async ({ o2r, env, net, onEvent, onMenu, onLog = () => {}, build = "" }) => {
-  // Esc opens the site's match menu (keys pressed in here don't reach the page).
-  window.addEventListener("keydown", (e) => { if (e.key === "Escape") onMenu?.(); });
+window.startMatch = async ({ o2r, env, net, onEvent, onMenu, readInput, onLog = () => {}, build = "" }) => {
+  // Keys held in this frame, for the site's input mapping (readInput). Esc
+  // opens the site's match menu (keys pressed in here don't reach the page).
+  const keys = new Set();
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") onMenu?.();
+    else keys.add(e.code);
+    if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
+  });
+  window.addEventListener("keyup", (e) => keys.delete(e.code));
+  window.addEventListener("blur", () => keys.clear());
   const v = build ? `?v=${build}` : "";
   const files = await Promise.all(
     FILES.map(async ([url, path]) => {
@@ -35,6 +44,8 @@ window.startMatch = async ({ o2r, env, net, onEvent, onMenu, onLog = () => {}, b
     print: onLog,
     printErr: onLog,
     ssbNet: { inbox, send: net.send },
+    // Polled by the engine every frame for this player's controller.
+    readPad: readInput ? () => readInput(keys, navigator.getGamepads?.() || []) : undefined,
     onGameEvent: onEvent,
     preRun: [() => {
       Object.assign(ENV, env);

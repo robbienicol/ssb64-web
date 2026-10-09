@@ -8,7 +8,7 @@ import { PRESET_COUNT, avatarHtml, playerCardHtml, recordText, presetSvg, player
 import { rankBadgeSvg, PLACEMENT_GAMES } from "./ui/ranks.js";
 import { mountKeyboard } from "./ui/keyboard.js";
 import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, syncGamepads, patchGamepadHandler } from "./ui/controls.js";
-import { initOnline, queue, leave } from "./ui/online.js";
+import { initOnline, queue, leave, inRankedMatch } from "./ui/online.js";
 import { ensureEngineFiles } from "./ui/engine.js";
 import { FIGHTERS, savedFighter, saveFighter } from "./ui/fighters.js";
 
@@ -374,6 +374,12 @@ registerScreen("size", {
   onEnter: () => setStatus("size-status", ""),
   onBack: () => go("mode"),
 });
+document.querySelectorAll("#screen-size [data-soon]").forEach((tile) =>
+  tile.addEventListener("click", () => {
+    sfx("error");
+    setStatus("size-status", "3 and 4 player online is coming soon. Bug robbiesurfs on Discord to get it working!");
+  })
+);
 document.querySelectorAll("#screen-size [data-size]").forEach((tile) =>
   tile.addEventListener("click", () => pickFighterThen("casual", Number(tile.dataset.size)))
 );
@@ -508,7 +514,8 @@ $("profile-back").addEventListener("click", () => go("main"));
 registerScreen("pause", {
   onEnter: () => {
     $("pause-title").textContent = playing === "online" ? "Match menu" : "Paused";
-    $("pause-quit").textContent = playing === "online" ? "Leave match" : "Quit to menu";
+    $("pause-quit").textContent =
+      playing !== "online" ? "Quit to menu" : inRankedMatch() ? "Forfeit match (loss)" : "Leave match";
   },
   onBack: closePause,
 });
