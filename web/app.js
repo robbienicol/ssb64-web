@@ -11,6 +11,7 @@ import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, 
 import { initOnline, queue, leave, inRankedMatch } from "./ui/online.js";
 import { ensureEngineFiles } from "./ui/engine.js";
 import { installPadFix } from "./ui/padfix.js";
+import * as raphnet from "./ui/raphnet.js";
 
 installPadFix(); // N64 adapters (raphnet) act like standard pads everywhere
 import { FIGHTERS, savedFighter, saveFighter, STAGE_CHOICES, savedStage, saveStage, savedCostume, saveCostume } from "./ui/fighters.js";
@@ -570,6 +571,29 @@ $("controls-reset").addEventListener("click", () => {
   toast(`P${controlsPlayer + 1} controls reset`);
 });
 $("controls-done").addEventListener("click", () => go(controlsFrom));
+
+// raphnet N64 adapters: direct reads over WebHID (Chrome/Edge) for online play.
+function renderRaphnet() {
+  $("raphnet-row").hidden = !raphnet.supported();
+  const on = raphnet.isConnected();
+  $("raphnet-connect").textContent = on ? "Disconnect raphnet" : "Connect raphnet adapter";
+  $("raphnet-status").textContent = on
+    ? `Reading ${raphnet.deviceName() || "the adapter"} directly: online matches get exact N64 input (P1).`
+    : "Real N64 controller? Online matches can read it directly: exact stick and buttons.";
+}
+$("raphnet-connect").addEventListener("click", async () => {
+  try {
+    if (raphnet.isConnected()) await raphnet.disconnect();
+    else if (!(await raphnet.connect(true))) toast("No adapter picked.");
+  } catch (err) {
+    sfx("error");
+    toast(err.message);
+  }
+  renderRaphnet();
+});
+raphnet.onChange(renderRaphnet);
+renderRaphnet();
+raphnet.connect(false).catch(() => {}); // an adapter allowed on an earlier visit
 
 // ---------- profile --------------------------------------------------------------------
 function renderProfile() {

@@ -3,6 +3,7 @@
 // keyboard layout. The engine reads this every frame.
 import { loadMaps } from "./controls.js";
 import { buttonLabel } from "./input.js";
+import { rawState } from "./raphnet.js";
 
 // N64 controller bits (PR/os_cont.h).
 const BIT = {
@@ -53,6 +54,9 @@ export function makeN64Reader() {
   // keys: Set of KeyboardEvent.code held in the game frame; pads: gamepads.
   function read(keys, pads) {
     if (++reads % 60 === 0) map = loadMaps()[0]; // picks up remaps from the match menu
+    // A raphnet adapter read directly: exact N64 buttons and stick, no mapping.
+    const raw = rawState();
+    if (raw) return withKeys({ buttons: raw.buttons, x: raw.x, y: raw.y }, keys);
     const pad = [...(pads || [])].filter(Boolean).sort((a, b) => a.index - b.index)[0];
     let buttons = 0;
     for (const [id, bit] of Object.entries(BIT)) {
@@ -80,4 +84,13 @@ export function makeN64Reader() {
     return { buttons, x: Math.round(x * STICK_MAX), y: Math.round(y * STICK_MAX) };
   }
   return { read };
+}
+
+// Keyboard on top of a direct read.
+function withKeys(pad, keys) {
+  if (!keys) return pad;
+  for (const code of keys) {
+    if (KEYS[code] !== undefined) pad.buttons |= BIT[KEYS[code]];
+  }
+  return pad;
 }
