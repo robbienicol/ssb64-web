@@ -14,6 +14,10 @@ import { sfx } from "./sfx.js";
 const SIZE_NAMES = { 2: "1 vs 1", 3: "3-player free-for-all", 4: "4-player free-for-all" };
 const CONNECT_TIMEOUT_MS = 25000; // WebRTC links to every player
 const START_TIMEOUT_MS = 90000; // engine download/boot and rollback sync
+// Networks that block direct WebRTC links fall back to relaying the engine's
+// packets through our server (more latency, but the match still happens).
+const RELAY_AFTER_MS = 6000;
+const forceRelay = () => { try { return localStorage.getItem("ssb64-web:relay") === "1"; } catch { return false; } };
 const RESULTS_HOLD_MS = 7000;
 
 let socket = null;
@@ -29,6 +33,7 @@ let early = []; // packets that arrive before the engine is up
 let connectTimer = null;
 let overTimer = null;
 let reported = false;
+let relaying = false;
 
 export function initOnline(h) {
   hooks = h;
@@ -64,6 +69,7 @@ async function connect() {
   });
   socket.on("mm-matched", onMatched);
   socket.on("mm-signal", ({ from, data }) => mesh?.signal(from, data));
+  socket.on("mm-relay", ({ from, data }) => receive(from, data));
   socket.on("mm-ended", ({ reason }) => {
     console.warn("[online] match ended by server:", reason);
     if (state !== "over") finish(reason);
@@ -123,10 +129,22 @@ function setStatus(text) {
   if (el) el.textContent = text;
 }
 
+function receive(slot, data) {
+  if (engine) engine.deliver(`p${slot}`, data);
+  else if (early.length < 256) early.push([slot, data]);
+}
+
+// Direct link when it's up, else through the server once relaying.
+function sendTo(slot, bytes) {
+  if (mesh?.isOpen(slot) && !forceRelay()) mesh.send(slot, bytes);
+  else if (relaying) socket.emit("mm-relay", { to: slot, data: new Uint8Array(bytes).buffer });
+}
+
 async function onMatched(m) {
   match = m;
   state = "starting";
   reported = false;
+  relaying = false;
   early = [];
   sfx("go");
   renderLobby();
@@ -137,19 +155,24 @@ async function onMatched(m) {
     self: m.slot,
     count,
     signal: (to, data) => socket.emit("mm-signal", { to, data }),
-    onMessage: (slot, data) => {
-      if (engine) engine.deliver(`p${slot}`, data);
-      else if (early.length < 256) early.push([slot, data]);
-    },
-    onLost: (slot) => {
-      if (state === "playing") abort(`${m.roster[slot]?.gamertag || "A player"} disconnected.`);
-    },
+    onMessage: receive,
+    // A direct link that drops mid-match: carry on through the server.
+    onLost: () => { relaying = true; },
   });
   connectTimer = setTimeout(() => abort("Couldn't connect to every player. Try again."), CONNECT_TIMEOUT_MS);
 
   try {
     setStatus("Connecting to players…");
-    const [o2r] = await Promise.all([hooks.ensureFiles(), mesh.ready]);
+    const linked = Promise.race([
+      mesh.ready.catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, RELAY_AFTER_MS)),
+    ]).then(() => {
+      if (!mesh?.isOpen(m.slot === 0 ? 1 : 0) || forceRelay()) {
+        relaying = true;
+        console.warn("[online] no direct link; relaying through the server");
+      }
+    });
+    const [o2r] = await Promise.all([hooks.ensureFiles(), linked]);
     if (match !== m) return;
     clearTimeout(connectTimer);
     connectTimer = setTimeout(() => abort("The match took too long to start. Try again."), START_TIMEOUT_MS);
@@ -167,7 +190,7 @@ async function onMatched(m) {
         SSB64_ROLLBACK_DELAY: "2",
         SSB64_NETPLAY_BATTLE: m.battle.spec,
       },
-      net: { send: (peer, bytes) => mesh?.send(Number(peer.slice(1)), bytes) },
+      net: { send: (peer, bytes) => sendTo(Number(peer.slice(1)), bytes) },
       onEvent,
     });
     if (match !== m) return;

@@ -64,6 +64,7 @@ export function createMesh({ self, count, signal, onMessage, onLost }) {
   return {
     ready,
     signal: onSignal,
+    isOpen: (slot) => peers.get(slot)?.dc.readyState === "open",
     send(slot, bytes) {
       const peer = peers.get(slot);
       if (peer?.dc.readyState === "open") peer.dc.send(bytes);

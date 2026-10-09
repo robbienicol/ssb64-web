@@ -450,6 +450,17 @@ io.on("connection", (socket) => {
     to.emit("mm-signal", { from, data: msg.data });
   });
 
+  // Fallback transport when two players can't link directly: engine packets
+  // relayed through the server ({ to: slot, data: ArrayBuffer }).
+  socket.on("mm-relay", (msg) => {
+    const lobby = lobbyOf(socket);
+    if (!lobby || lobby.status === "waiting" || lobby.status === "done") return;
+    const from = lobby.members.indexOf(socket);
+    const to = lobby.members[Number(msg?.to)];
+    if (from < 0 || !to || to === socket || !msg.data || msg.data.length > 2048) return;
+    to.volatile.emit("mm-relay", { from, data: msg.data });
+  });
+
   // Any member reports the finished battle as the engine saw it (every peer
   // simulates the same battle). The first valid report is recorded.
   // results: { players: [{ slot, place, ... }] } — place 0 is the winner.
