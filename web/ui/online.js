@@ -34,6 +34,7 @@ let connectTimer = null;
 let overTimer = null;
 let reported = false;
 let relaying = false;
+let perf = null; // match performance, reported to the server for tuning
 
 export function initOnline(h) {
   hooks = h;
@@ -146,6 +147,7 @@ async function onMatched(m) {
   reported = false;
   relaying = false;
   early = [];
+  perf = { start: 0, samples: [], last: null };
   sfx("go");
   renderLobby();
   const count = m.roster.length;
@@ -201,8 +203,45 @@ async function onMatched(m) {
   }
 }
 
+// stats every 120 frames: { frame, ping, rollbacks, stalls, ahead, work, skipped }
+function onStats(detail) {
+  const now = performance.now();
+  if (perf.last) {
+    const fps = ((detail.frame - perf.last.frame) * 1000) / (now - perf.lastAt);
+    perf.samples.push({ fps, ping: detail.ping, work: detail.work, skipped: detail.skipped, ahead: detail.ahead });
+  }
+  perf.last = detail;
+  perf.lastAt = now;
+  hooks.showPing?.(detail.ping, relaying);
+}
+
+function sendTelemetry(outcome) {
+  if (!perf?.samples.length || perf.sent) return;
+  perf.sent = true;
+  const s = perf.samples;
+  const avg = (k) => Math.round((s.reduce((a, x) => a + x[k], 0) / s.length) * 10) / 10;
+  const min = (k) => Math.round(Math.min(...s.map((x) => x[k])) * 10) / 10;
+  const max = (k) => Math.round(Math.max(...s.map((x) => x[k])) * 10) / 10;
+  socket?.emit("mm-telemetry", {
+    outcome,
+    relaying,
+    fps: { avg: avg("fps"), min: min("fps") },
+    ping: { avg: avg("ping"), max: max("ping") },
+    workMs: { avg: avg("work"), max: max("work") },
+    skipped: s.reduce((a, x) => a + x.skipped, 0),
+    ahead: avg("ahead"),
+    rollbacks: perf.last?.rollbacks,
+    stalls: perf.last?.stalls,
+    frames: perf.last?.frame,
+    cores: navigator.hardwareConcurrency,
+    ua: navigator.userAgent,
+  });
+}
+
 function onEvent(type, detail) {
-  if (type === "session-start") {
+  if (type === "stats") {
+    onStats(detail);
+  } else if (type === "session-start") {
     clearTimeout(connectTimer);
     state = "playing";
     socket.emit("mm-playing");
@@ -211,6 +250,7 @@ function onEvent(type, detail) {
       reported = true;
       state = "over";
       socket.emit("mm-battle", detail);
+      sendTelemetry("finished");
       const winner = detail?.players?.find((p) => p.place === 0);
       if (winner) hooks.toast?.(`${match?.roster[winner.slot]?.gamertag || "?"} wins!`);
       overTimer = setTimeout(() => {
@@ -232,6 +272,8 @@ function abort(message) {
 }
 
 function finish(message) {
+  sendTelemetry(message ? "aborted" : "left");
+  hooks.showPing?.(null);
   clearTimeout(connectTimer);
   clearTimeout(overTimer);
   engine?.close();

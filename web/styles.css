@@ -38,6 +38,11 @@ button { font: inherit; color: inherit; }
 /* Online matches: the rollback engine's iframe covers the emulator. */
 .engine-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
 #game-layer.engine #game { visibility: hidden; }
+#ping { position: absolute; top: 10px; right: 12px; z-index: 3; pointer-events: none; padding: 3px 8px; border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55); font: 700 11px var(--pixel); letter-spacing: 0.04em; }
+#ping.good { color: #7dff8a; }
+#ping.ok { color: #ffe26a; }
+#ping.bad { color: #ff6b6b; }
 #menu-layer { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; z-index: 10; }
 #menu-layer.overlay .bg { opacity: 0.9; }
 
@@ -164,6 +169,10 @@ h2 {
 
 /* ---------- title ---------- */
 .title-block { text-align: center; }
+.credit { margin-top: 28px; font: 400 11px var(--pixel); color: #c9cff5; text-shadow: 0 2px 0 var(--ink); letter-spacing: 0.04em; }
+.credit b { color: var(--gold-1); font-weight: 700; }
+.credit a { color: #9fd3ff; }
+.menu .credit { margin-top: 18px; }
 .title-logo { font-size: clamp(56px, 11vw, 132px); line-height: 1; -webkit-text-stroke-width: 4px; filter: drop-shadow(0 8px 0 var(--ink)) drop-shadow(0 0 30px rgba(255, 178, 26, 0.4)); animation: float 3s ease-in-out infinite; }
 @keyframes float { 50% { transform: translateY(-8px) rotate(-1deg); } }
 .title-sub { font: 400 14px var(--pixel); color: #e3e7ff; text-shadow: 0 2px 0 var(--ink); margin: 18px 0 44px; letter-spacing: 0.06em; }

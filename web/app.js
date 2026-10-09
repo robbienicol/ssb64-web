@@ -342,6 +342,14 @@ initOnline({
   me: () => me,
   gamertag: () => me?.gamertag,
   ensureFiles: () => ensureEngineFiles(baseRom, toast),
+  showPing: (ms, relayed) => {
+    const el = $("ping");
+    el.hidden = ms === null || ms === undefined;
+    if (!el.hidden) {
+      el.textContent = `${relayed ? "RELAY " : ""}${ms} MS`;
+      el.className = ms < 60 ? "good" : ms < 120 ? "ok" : "bad";
+    }
+  },
   container: () => $("game-layer"),
   enterGame: () => enterGame("online"),
   exitToMenu,

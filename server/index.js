@@ -461,6 +461,13 @@ io.on("connection", (socket) => {
     to.volatile.emit("mm-relay", { from, data: msg.data });
   });
 
+  // Per-match performance from each browser (frame rate, ping, rollbacks), for tuning.
+  socket.on("mm-telemetry", (t) => {
+    if (!t || typeof t !== "object") return;
+    const row = playerById(socket.data.playerId);
+    console.log("telemetry", JSON.stringify({ player: row?.gamertag, ...t }).slice(0, 1500));
+  });
+
   // Any member reports the finished battle as the engine saw it (every peer
   // simulates the same battle). The first valid report is recorded.
   // results: { players: [{ slot, place, ... }] } — place 0 is the winner.
