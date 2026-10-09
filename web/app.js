@@ -7,7 +7,7 @@ import * as api from "./ui/api.js";
 import { PRESET_COUNT, avatarHtml, playerCardHtml, recordText, presetSvg, playerRank } from "./ui/avatars.js";
 import { rankBadgeSvg, PLACEMENT_GAMES } from "./ui/ranks.js";
 import { mountKeyboard } from "./ui/keyboard.js";
-import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, syncGamepads } from "./ui/controls.js";
+import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, syncGamepads, patchGamepadHandler } from "./ui/controls.js";
 import { initOnline, queue, leave } from "./ui/online.js";
 
 const EJS_CDN = "https://cdn.emulatorjs.org/4.3.0-pre";
@@ -101,7 +101,7 @@ async function bootEmulator() {
       emulatorReady = true;
       UNLOCK_ALL_CHEATS.forEach((code, i) => emu().gameManager.setCheat(i, 1, code));
       applyMaps();
-      syncGamepads();
+      patchGamepadHandler();
       setInterval(syncGamepads, 1000);
       if (!playing) pauseGame();
     },

@@ -74,26 +74,40 @@ export function applyMaps(maps = loadMaps()) {
   emu.saveSettings?.();
 }
 
-// EmulatorJS only gives a controller to a player when the controller connects
-// after its settings menu exists, so a pad already in use on our menus never
-// reached the game. Hand connected pads to players 1-4 in connection order
-// (the same order the controls screen shows) and free slots of unplugged ones.
+// EmulatorJS gamepad fixes:
+// - it only gives a controller to a player when the controller connects after
+//   its settings menu exists, so a pad already in use on our menus never
+//   reached the game;
+// - it looks pads up by the browser's slot number in a list that has no empty
+//   slots, so a pad the browser reports in slot 2+ (common for PS4 pads)
+//   throws on every press.
+// Pads go to players 1-4 in slot order, the same order the controls screen shows.
 export function syncGamepads() {
   const emu = window.EJS_emulator;
   if (!emu?.gamepad || !Array.isArray(emu.gamepadSelection)) return;
-  const connected = (emu.gamepad.gamepads || []).filter(Boolean).map((g) => `${g.id}_${g.index}`);
+  const connected = (emu.gamepad.gamepads || [])
+    .filter(Boolean)
+    .sort((a, b) => a.index - b.index)
+    .map((g) => `${g.id}_${g.index}`);
+  const next = [0, 1, 2, 3].map((p) => connected[p] || "");
   const selection = emu.gamepadSelection;
-  while (selection.length < 4) selection.push("");
-  let changed = false;
-  for (let p = 0; p < selection.length; p++) {
-    if (selection[p] && !connected.includes(selection[p])) { selection[p] = ""; changed = true; }
-  }
-  for (const id of connected) {
-    if (selection.includes(id)) continue;
-    const free = selection.indexOf("");
-    if (free < 0) break;
-    selection[free] = id;
-    changed = true;
-  }
-  if (changed && emu.gamepadLabels) emu.updateGamepadLabels?.();
+  if (next.every((id, p) => selection[p] === id) && selection.length >= 4) return;
+  next.forEach((id, p) => { selection[p] = id; });
+  if (emu.gamepadLabels) emu.updateGamepadLabels?.();
+}
+
+export function patchGamepadHandler() {
+  const emu = window.EJS_emulator;
+  if (!emu?.gamepad || emu.gamepad.__ssbPatched) return;
+  emu.gamepad.__ssbPatched = true;
+  const forward = (e) => {
+    const pos = emu.gamepad.gamepads.findIndex((g) => g && g.index === e.gamepadIndex);
+    if (pos >= 0) emu.gamepadEvent({ ...e, gamepadIndex: pos });
+  };
+  emu.gamepad.on("buttondown", forward);
+  emu.gamepad.on("buttonup", forward);
+  emu.gamepad.on("axischanged", forward);
+  emu.gamepad.on("connected", () => syncGamepads());
+  emu.gamepad.on("disconnected", () => setTimeout(syncGamepads, 0));
+  syncGamepads();
 }
