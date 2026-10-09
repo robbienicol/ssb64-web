@@ -228,12 +228,15 @@ function battleSpec(lobby) {
     }
   }
   const seed = randomInt(1, 2 ** 31);
+  // Casual demo/bot players: the game's own CPU plays that slot on every peer.
+  const cpus = lobby.ranked ? [] : lobby.members.map((s) => s.data.cpu || 0);
+  const cpuSpec = cpus.some((c) => c > 0) ? ` cpus=${cpus.join(",")}` : "";
   return {
     stage,
     pickedBy,
     randomStage,
     fighters,
-    spec: `stage=${stage} seed=${seed} stocks=${STOCKS} fighters=${fighters.join(",")} costumes=${costumes.join(",")}`,
+    spec: `stage=${stage} seed=${seed} stocks=${STOCKS} fighters=${fighters.join(",")} costumes=${costumes.join(",")}${cpuSpec}`,
   };
 }
 
@@ -398,6 +401,7 @@ io.on("connection", (socket) => {
     socket.data.fighter = data?.fighter;
     socket.data.stage = data?.stage;
     socket.data.costume = data?.costume;
+    socket.data.cpu = ranked ? 0 : Math.max(0, Math.min(9, Math.floor(Number(data?.cpu) || 0)));
 
     if (ranked) {
       rankedQueue.push({ socket, mmr: row.mmr, since: Date.now() });

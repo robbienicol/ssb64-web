@@ -18,6 +18,9 @@ const START_TIMEOUT_MS = 90000; // engine download/boot and rollback sync
 // packets through our server (more latency, but the match still happens).
 const RELAY_AFTER_MS = 6000;
 const forceRelay = () => { try { return localStorage.getItem("ssb64-web:relay") === "1"; } catch { return false; } };
+// Dev/demo flags: "ssb64-web:cpu" = CPU level (1-9) this player's slot plays
+// as in casual; "ssb64-web:engine-env" = JSON engine settings (e.g. muting).
+const devFlag = (k) => { try { return localStorage.getItem(`ssb64-web:${k}`); } catch { return null; } };
 const RESULTS_HOLD_MS = 7000;
 
 let socket = null;
@@ -105,7 +108,7 @@ export async function queue(mode, size, fighter, costume, stage) {
   await connect();
   const ranked = mode === "ranked";
   const res = await new Promise((resolve) =>
-    socket.emit("mm-queue", { token: getToken(), mode, size, fighter, costume, stage }, resolve)
+    socket.emit("mm-queue", { token: getToken(), mode, size, fighter, costume, stage, cpu: Number(devFlag("cpu")) || 0 }, resolve)
   );
   if (res?.error) throw new Error(res.error);
   state = "waiting";
@@ -192,6 +195,7 @@ async function onMatched(m) {
         SSB64_ROLLBACK_PEERS: peers,
         SSB64_ROLLBACK_DELAY: "2",
         SSB64_NETPLAY_BATTLE: m.battle.spec,
+        ...(() => { try { return JSON.parse(devFlag("engine-env") || "{}"); } catch { return {}; } })(),
       },
       net: { send: (peer, bytes) => sendTo(Number(peer.slice(1)), bytes) },
       onEvent,
