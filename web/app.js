@@ -10,6 +10,9 @@ import { mountKeyboard } from "./ui/keyboard.js";
 import { N64_INPUTS, DEFAULT_MAP, loadMaps, saveMaps, applyMaps, prettyBinding, syncGamepads, patchGamepadHandler } from "./ui/controls.js";
 import { initOnline, queue, leave, inRankedMatch } from "./ui/online.js";
 import { ensureEngineFiles } from "./ui/engine.js";
+import { installPadFix } from "./ui/padfix.js";
+
+installPadFix(); // N64 adapters (raphnet) act like standard pads everywhere
 import { FIGHTERS, savedFighter, saveFighter, STAGE_CHOICES, savedStage, saveStage, savedCostume, saveCostume } from "./ui/fighters.js";
 
 const EJS_CDN = "https://cdn.emulatorjs.org/4.3.0-pre";

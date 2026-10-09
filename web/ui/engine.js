@@ -3,6 +3,7 @@
 // iframe (web/engine/play.html) that is removed when the match ends.
 import { loadAsset, saveAsset } from "../rom.js";
 import { makeN64Reader } from "./n64pad.js";
+import { installPadFix } from "./padfix.js";
 
 let manifest = null;
 let preparing = null;
@@ -78,6 +79,7 @@ export async function startEngine({ container, o2r, env, net, onEvent }) {
       frame.addEventListener("load", resolve, { once: true });
       frame.addEventListener("error", () => reject(new Error("Couldn't load the game engine.")), { once: true });
     });
+    installPadFix(frame.contentWindow);
     const match = await frame.contentWindow.startMatch({
       o2r,
       env,
